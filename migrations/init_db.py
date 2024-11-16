@@ -1,12 +1,17 @@
 import sqlite3
+import os
+
+os.makedirs('instance', exist_ok=True)
 
 def init_db():
-    conn = sqlite3.connect('instance/example.db')
+    conn = sqlite3.connect('instance/crowd-counting.db')
     c = conn.cursor()
     c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS videos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL
+            original_url TEXT NOT NULL,
+            annotated_url TEXT NOT NULL,
+            averageCountPerFrame REAL NOT NULL
         )
     ''')
     conn.commit()

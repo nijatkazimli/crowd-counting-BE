@@ -1,7 +1,7 @@
 import sqlite3
 from flask import g
 
-DATABASE = 'instance/example.db'
+DATABASE = 'instance/crowd-counting.db'
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE)
