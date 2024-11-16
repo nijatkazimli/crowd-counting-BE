@@ -7,7 +7,7 @@ def init_db():
     conn = sqlite3.connect('instance/crowd-counting.db')
     c = conn.cursor()
     c.execute('''
-        CREATE TABLE IF NOT EXISTS videos (
+        CREATE TABLE IF NOT EXISTS crowdCounting (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             original_url TEXT NOT NULL,
             annotated_url TEXT NOT NULL,
