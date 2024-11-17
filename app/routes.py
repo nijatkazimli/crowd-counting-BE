@@ -85,8 +85,14 @@ def upload_file():
 @app.route('/count/<int:id>', methods=['PUT'])
 def count(id):
     data = request.json
+    
+    # TODO: Daniel to download the video / image.
+    # Find the original_url using id given above.
+    # Annotate the video / image, upload it,
+    # and return it together with the average count per frame
     annotated_url = data.get("annotated_url", "http://127.0.0.1:10000/devstoreaccount1/crowd-counting/testImage.jpg")
     average_count_per_frame = data.get("average_count_per_frame", 3)
+
     model_id = data.get("model_id")
 
     if not model_id:
