@@ -31,7 +31,10 @@ def init_db():
         ('Model C',)
     ]
     
-    c.executemany('INSERT INTO models (name) VALUES (?)', models)
+    for model in models:
+        c.execute('SELECT COUNT(*) FROM models WHERE name=?', model)
+        if c.fetchone()[0] == 0:
+            c.execute('INSERT INTO models (name) VALUES (?)', model)
     
     conn.commit()
     conn.close()
