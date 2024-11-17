@@ -5,6 +5,8 @@ from app.azureUtils import get_blob_service_client, upload_file_to_blob
 from app.database import get_db_connection
 
 def replace_az_docker(url: str) -> str:
+    if len(url) == 0:
+        return url
     regex = r"^http://azuriteDocker:10000/"
     pattern = re.compile(regex)
     if pattern.search(url):
@@ -37,8 +39,8 @@ def get_all_data():
         for row in rows:
             data.append({
                 'id': row['id'],
-                'original_url': row['original_url'],
-                'annotated_url': row['annotated_url'],
+                'original_url': replace_az_docker(row['original_url']),
+                'annotated_url': replace_az_docker(row['annotated_url']),
                 'averageCountPerFrame': row['averageCountPerFrame'],
                 'model_name': row['model_name']
             })
@@ -63,7 +65,6 @@ def upload_file():
     blob_service_client = get_blob_service_client(connection_str)
     try:
         file_url = upload_file_to_blob(file, container_name, blob_service_client)
-        file_url = replace_az_docker(file_url)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -80,7 +81,7 @@ def upload_file():
     except Exception as e:
         return jsonify({"error": "Failed to insert into database: " + str(e)}), 500
 
-    return jsonify({"id": last_id, "url": file_url}), 200
+    return jsonify({"id": last_id, "url": replace_az_docker(file_url)}), 200
 
 @app.route('/count/<int:id>', methods=['PUT'])
 def count(id):
