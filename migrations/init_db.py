@@ -25,6 +25,7 @@ def init_db():
         )
     ''')
     
+    # TODO: Daniel to add actual models
     models = [
         ('Model A',),
         ('Model B',),
