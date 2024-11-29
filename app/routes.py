@@ -1,8 +1,16 @@
 from flask import request, jsonify
 from app import app
 import re
-from app.azureUtils import get_blob_service_client, upload_file_to_blob
+import os
+from app.azureUtils import get_blob_service_client, upload_file_to_blob, download_file_from_blob, upload_file_path_to_blob
 from app.database import get_db_connection
+from app.crowdCounting import annotate_and_count
+from ultralytics import YOLO
+
+localFileDir = '/localFiles'
+connection_str = app.config['AZURE_STORAGE_CONNECTION_STRING']
+container_name = app.config['AZURE_STORAGE_CONTAINER']
+blob_service_client = get_blob_service_client(connection_str)
 
 def replace_az_docker(url: str) -> str:
     if len(url) == 0:
@@ -59,10 +67,6 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    connection_str = app.config['AZURE_STORAGE_CONNECTION_STRING']
-    container_name = app.config['AZURE_STORAGE_CONTAINER']
-
-    blob_service_client = get_blob_service_client(connection_str)
     try:
         file_url = upload_file_to_blob(file, container_name, blob_service_client)
     except Exception as e:
@@ -86,14 +90,6 @@ def upload_file():
 @app.route('/count/<int:id>', methods=['PUT'])
 def count(id):
     data = request.json
-    
-    # TODO: Daniel to download the video / image.
-    # Find the original_url using id given above.
-    # Annotate the video / image, upload it,
-    # and return it together with the average count per frame
-    annotated_url = data.get("annotated_url", "http://127.0.0.1:10000/devstoreaccount1/crowd-counting/testImage.jpg")
-    average_count_per_frame = data.get("average_count_per_frame", 3)
-
     model_id = data.get("model_id")
 
     if not model_id:
@@ -103,25 +99,42 @@ def count(id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('SELECT id FROM models WHERE id = ?', (model_id,))
+        cursor.execute('SELECT id, name FROM models WHERE id = ?', (model_id,))
         model = cursor.fetchone()
 
         if model is None:
             conn.close()
             return jsonify({"error": "Model not found"}), 404
+    
+        model_name = model['name']
+        model_path = f"/backend/models/{model_name}.pt"
+        
+        if not os.path.exists(model_path):
+            conn.close()
+            return jsonify({"error": f"Model file {model_path} not found"}), 404
+        
+        loaded_model = YOLO(model_path)
 
-        cursor.execute('SELECT id FROM crowdCounting WHERE id = ?', (id,))
+        cursor.execute('SELECT id, original_url FROM crowdCounting WHERE id = ?', (id,))
         record = cursor.fetchone()
 
         if record is None:
             conn.close()
             return jsonify({"error": "Record not found"}), 404
+        remote_url = record['original_url']
 
+        if not remote_url:
+            conn.close()
+            return jsonify({"error": "Original file not found"}), 404
+        
+        download_path = download_file_from_blob(remote_url, blob_service_client, localFileDir, container_name)
+        average_count, output_path = annotate_and_count(loaded_model, input_path=download_path)
+        annotated_url = upload_file_path_to_blob(output_path, container_name, blob_service_client)
         cursor.execute('''
             UPDATE crowdCounting
             SET annotated_url = ?, averageCountPerFrame = ?, model_id = ?
             WHERE id = ?
-        ''', (annotated_url, average_count_per_frame, model_id, id))
+        ''', (replace_az_docker(annotated_url), average_count, model_id, id))
         conn.commit()
 
         cursor.execute('SELECT id, annotated_url FROM crowdCounting WHERE id = ?', (id,))
@@ -133,7 +146,7 @@ def count(id):
 
         return jsonify({"id": updated_row['id'], "url": updated_row['annotated_url']}), 200
     except Exception as e:
-        return jsonify({"error": "Failed to update database: " + str(e)}), 500
+        return jsonify({"error": "Failed to count: " + str(e)}), 500
 
 @app.route('/models', methods=['GET'])
 def get_model_names():
