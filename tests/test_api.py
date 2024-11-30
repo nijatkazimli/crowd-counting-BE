@@ -28,5 +28,6 @@ class TestCrowdCounting(unittest.TestCase):
         self.assertIn('id', response.json[0])
         self.assertIn('original_url', response.json[0])
 
+
 if __name__ == '__main__':
     unittest.main()
