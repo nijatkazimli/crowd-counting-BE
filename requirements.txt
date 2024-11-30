@@ -3,6 +3,5 @@ Flask-Cors
 azure-storage-blob
 python-dotenv
 ultralytics
-opencv-python
 pandas
 dill

@@ -1,5 +1,6 @@
 import cv2
 import pandas as pd
+import subprocess
 import os
 
 class_list = ["person"]
@@ -33,12 +34,12 @@ def annotate_and_count(model, input_path, output_path=None):
     font = cv2.FONT_HERSHEY_SIMPLEX
     thickness = 3
     (text_width, text_height), _ = cv2.getTextSize(text, font, font_scale, thickness)
-    x = 10
-    y = 20
+    x = 60
+    y = 80
     if x + text_width > frame_width:
-        x = frame_width - text_width - 10
+        x = frame_width - text_width - 60
     if y + text_height > frame_height:
-        y = frame_height - text_height - 10
+        y = frame_height - text_height - 80
         
         
 
@@ -47,8 +48,20 @@ def annotate_and_count(model, input_path, output_path=None):
         if output_path is None:
             base, _ = os.path.splitext(input_path)
             output_path = f"{base}_counted.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+            
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-y",
+            "-f", "rawvideo",
+            "-pix_fmt", "bgr24",
+            "-s", f"{frame_width}x{frame_height}",
+            "-r", str(int(fps)),
+            "-i", "-",
+            "-vcodec", "libx264",
+            "-pix_fmt", "yuv420p",
+            output_path,
+        ]
+        process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
 
         total_people = 0
         frame_count = 0
@@ -77,10 +90,11 @@ def annotate_and_count(model, input_path, output_path=None):
                 (0, 0, 0),
                 thickness
             )
-            out.write(frame)
+            process.stdin.write(frame.tobytes())
 
         cap.release()
-        out.release()
+        process.stdin.close()
+        process.wait()
         average_count = total_people / frame_count if frame_count else 0
     else:  # Image
         if output_path is None:
