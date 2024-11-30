@@ -162,3 +162,29 @@ def get_model_names():
         return jsonify(models), 200
     except Exception as e:
         return jsonify({"error": "Failed to fetch model names from database: " + str(e)}), 500
+    
+@app.route('/get/<int:id>', methods=['GET'])
+def get(id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT id, original_url, annotated_url, averageCountPerFrame FROM crowdCounting WHERE id = ?', (id,))
+        record = cursor.fetchone()
+
+        if record is None:
+            conn.close()
+            return jsonify({"error": "Record not found"}), 404
+
+        data = {
+            'id': record['id'],
+            'original_url': replace_az_docker(record['original_url']),
+            'annotated_url': replace_az_docker(record['annotated_url']),
+            'averageCountPerFrame': record['averageCountPerFrame']
+        }
+
+        conn.close()
+        return jsonify(data)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
