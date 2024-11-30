@@ -5,6 +5,21 @@ import os
 
 class_list = ["person"]
 
+def convert_webm_to_mp4(input_path: str, output_path: str):
+    """
+    Converts a WebM video file to MP4 using FFmpeg.
+    """
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-i", input_path,
+        "-vcodec", "libx264",
+        "-acodec", "aac",
+        "-strict", "experimental",
+        output_path
+    ]
+    
+    subprocess.run(ffmpeg_cmd, check=True)
+
 def get_person_coordinates(model, frame):
     results = model.predict(frame, verbose=False)
     a = results[0].boxes.data.detach().cpu()
@@ -20,6 +35,13 @@ def get_person_coordinates(model, frame):
 
 def annotate_and_count(model, input_path, output_path=None):
     """Process video/image, annotate, and calculate crowd count."""
+    if input_path.endswith(".webm"):
+        if output_path is None:
+            base, _ = os.path.splitext(input_path)
+            output_path = f"{base}.mp4"
+        convert_webm_to_mp4(input_path, output_path)
+        print(f"Converted WebM to MP4: {output_path}")
+        input_path = output_path
     cap = cv2.VideoCapture(input_path)
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
