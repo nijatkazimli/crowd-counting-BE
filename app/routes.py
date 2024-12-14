@@ -6,6 +6,7 @@ from app.azureUtils import get_blob_service_client, upload_file_to_blob, downloa
 from app.database import get_db_connection
 from app.crowdCounting import annotate_and_count
 from ultralytics import YOLO
+import pandas as pd
 
 localFileDir = '/localFiles'
 connection_str = app.config['AZURE_STORAGE_CONNECTION_STRING']
@@ -56,6 +57,42 @@ def get_all_data():
         return jsonify(data), 200
     except Exception as e:
         return jsonify({"error": "Failed to fetch data from database: " + str(e)}), 500
+    
+@app.route('/insights', methods=['GET'])
+def get_insights():
+    try:
+        conn = get_db_connection()
+
+        query = '''
+        SELECT 
+            m.name AS model_name,
+            COUNT(cc.id) AS model_usage_count,
+            SUM(CASE WHEN cc.averageCountPerFrame BETWEEN 0 AND 5 THEN 1 ELSE 0 END) AS count_0_5,
+            SUM(CASE WHEN cc.averageCountPerFrame > 5 AND cc.averageCountPerFrame <= 25 THEN 1 ELSE 0 END) AS count_5_25,
+            SUM(CASE WHEN cc.averageCountPerFrame > 25 AND cc.averageCountPerFrame <= 50 THEN 1 ELSE 0 END) AS count_25_50,
+            SUM(CASE WHEN cc.averageCountPerFrame > 50 AND cc.averageCountPerFrame <= 100 THEN 1 ELSE 0 END) AS count_50_100,
+            SUM(CASE WHEN cc.averageCountPerFrame > 100 THEN 1 ELSE 0 END) AS count_100_plus
+        FROM 
+            crowdCounting cc
+        LEFT JOIN 
+            models m ON cc.model_id = m.id
+        WHERE
+            cc.annotated_url IS NOT NULL AND cc.annotated_url != ''
+        GROUP BY 
+            m.name;
+        '''
+
+        df = pd.read_sql_query(query, conn)
+
+        insights = df.to_dict(orient='records')
+
+        return jsonify({"data": insights})
+
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+
+    finally:
+        conn.close()
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

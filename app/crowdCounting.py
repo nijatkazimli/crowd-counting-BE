@@ -102,7 +102,10 @@ def annotate_and_count(model, input_path, output_path=None):
             base, ext = os.path.splitext(input_path)
             output_path = f"{base}_counted{ext}"
 
+        cap.release()
+        cap = cv2.VideoCapture(input_path)        
         ret, frame = cap.read()
+        people_count = 0
         if ret:
             person_coords = get_person_coordinates(model, frame)
             for bbox in person_coords:
@@ -112,7 +115,9 @@ def annotate_and_count(model, input_path, output_path=None):
             people_count = len(person_coords)
             text = f"People: {people_count}"
             cv2.putText(frame, text, (x, y), font, font_scale, (0, 0, 0), thickness)
+            print(output_path)
             cv2.imwrite(output_path, frame)
+            print('write successful')
 
         cap.release()
         average_count = people_count
