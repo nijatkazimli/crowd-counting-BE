@@ -3,24 +3,11 @@ import pandas as pd
 import subprocess
 import os
 
+# Define the class list for your detection model
 class_list = ["person"]
 
-def convert_webm_to_mp4(input_path: str, output_path: str):
-    """
-    Converts a WebM video file to MP4 using FFmpeg.
-    """
-    ffmpeg_cmd = [
-        "ffmpeg",
-        "-i", input_path,
-        "-vcodec", "libx264",
-        "-acodec", "aac",
-        "-strict", "experimental",
-        output_path
-    ]
-    
-    subprocess.run(ffmpeg_cmd, check=True)
-
 def get_person_coordinates(model, frame):
+    """Get the bounding box coordinates for detected 'person' class."""
     results = model.predict(frame, verbose=False)
     a = results[0].boxes.data.detach().cpu()
     px = pd.DataFrame(a).astype("float")
@@ -34,21 +21,13 @@ def get_person_coordinates(model, frame):
     return person_coords
 
 def annotate_and_count(model, input_path, output_path=None):
-    """Process video/image, annotate, and calculate crowd count."""
-    if input_path.endswith(".webm"):
-        if output_path is None:
-            base, _ = os.path.splitext(input_path)
-            output_path = f"{base}.mp4"
-        convert_webm_to_mp4(input_path, output_path)
-        print(f"Converted WebM to MP4: {output_path}")
-        input_path = output_path
+    """Process video/image, annotate with bounding boxes, and calculate crowd count."""
+    # Open the video or image
     cap = cv2.VideoCapture(input_path)
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)  # Default FPS to 30 if unavailable
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-
 
     text = "People: 99"
     font_scale = frame_width / 1000
@@ -56,28 +35,24 @@ def annotate_and_count(model, input_path, output_path=None):
     font = cv2.FONT_HERSHEY_SIMPLEX
     thickness = 3
     (text_width, text_height), _ = cv2.getTextSize(text, font, font_scale, thickness)
-    x = 60
-    y = 80
+    x, y = 60, 80
     if x + text_width > frame_width:
         x = frame_width - text_width - 60
     if y + text_height > frame_height:
         y = frame_height - text_height - 80
-        
-        
-
 
     if total_frames > 1:  # Video
         if output_path is None:
             base, _ = os.path.splitext(input_path)
             output_path = f"{base}_counted.mp4"
-            
+
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",
             "-f", "rawvideo",
             "-pix_fmt", "bgr24",
             "-s", f"{frame_width}x{frame_height}",
-            "-r", str(int(fps)),
+            "-r", str(fps),
             "-i", "-",
             "-vcodec", "libx264",
             "-pix_fmt", "yuv420p",
@@ -88,7 +63,7 @@ def annotate_and_count(model, input_path, output_path=None):
         total_people = 0
         frame_count = 0
 
-        while cap.isOpened():
+        while True:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -101,27 +76,21 @@ def annotate_and_count(model, input_path, output_path=None):
             people_count = len(person_coords)
             total_people += people_count
             frame_count += 1
-            
+
             text = f"People: {people_count}"
-            cv2.putText(
-                frame,
-                text,
-                (x, y),
-                font,
-                font_scale,
-                (0, 0, 0),
-                thickness
-            )
+            cv2.putText(frame, text, (x, y), font, font_scale, (0, 0, 0), thickness)
             process.stdin.write(frame.tobytes())
 
         cap.release()
         process.stdin.close()
         process.wait()
+
         average_count = total_people / frame_count if frame_count else 0
     else:  # Image
         if output_path is None:
             base, ext = os.path.splitext(input_path)
             output_path = f"{base}_counted{ext}"
+
         ret, frame = cap.read()
         if ret:
             person_coords = get_person_coordinates(model, frame)
@@ -131,16 +100,7 @@ def annotate_and_count(model, input_path, output_path=None):
 
             people_count = len(person_coords)
             text = f"People: {people_count}"
-            cv2.putText(
-                frame,
-                text,
-                (x, y),
-                font,
-                font_scale,
-                (0, 0, 0),
-                thickness
-            )
-
+            cv2.putText(frame, text, (x, y), font, font_scale, (0, 0, 0), thickness)
             cv2.imwrite(output_path, frame)
 
         cap.release()
