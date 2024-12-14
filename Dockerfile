@@ -2,17 +2,16 @@ FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y \
     build-essential \
-    gcc \
+    ffmpeg \
     g++ \
-    make \
+    gcc \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    ffmpeg \
     libx264-dev \
+    make \
     python3-opencv \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --upgrade pip setuptools wheel
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip setuptools wheel
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
