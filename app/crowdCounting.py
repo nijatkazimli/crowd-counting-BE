@@ -22,12 +22,23 @@ def get_person_coordinates(model, frame):
 
 def annotate_and_count(model, input_path, output_path=None):
     """Process video/image, annotate with bounding boxes, and calculate crowd count."""
-    # Open the video or image
+    is_video = False
+    frame_check_count = 0
+
     cap = cv2.VideoCapture(input_path)
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)  # Default FPS to 30 if unavailable
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)
+    
+    while cap.isOpened():
+        ret, _ = cap.read()
+        if not ret:
+            break
+        frame_check_count += 1
+        if frame_check_count > 1:
+            is_video = True
+            break  
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)     
 
     text = "People: 99"
     font_scale = frame_width / 1000
@@ -41,7 +52,7 @@ def annotate_and_count(model, input_path, output_path=None):
     if y + text_height > frame_height:
         y = frame_height - text_height - 80
 
-    if total_frames > 1:  # Video
+    if is_video:  # Video
         if output_path is None:
             base, _ = os.path.splitext(input_path)
             output_path = f"{base}_counted.mp4"
